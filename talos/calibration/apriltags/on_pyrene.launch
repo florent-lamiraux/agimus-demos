@@ -1,6 +1,6 @@
 <launch>
   <machine name="multimedia" address="talos-1m"
-    env-loader="/home/pal/devel/config_roslaunch.sh"/>
+    env-loader="/home/pal/florent/agimus/config_roslaunch.sh"/>
   <!-- Initialization of robot root_joint pose as a ROS param
        value = "x y z X Y Z W" where Xi+Yj+Zk+W is a quaternion -->
   <param name="robot_initial_pose"

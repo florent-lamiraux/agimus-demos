@@ -1,6 +1,6 @@
 <launch>
   <machine name="multimedia" address="talos-1m"
-    env-loader="/home/pal/devel/config_roslaunch.sh"/>
+    env-loader="/home/pal/florent/agimus/config_roslaunch.sh"/>
   <arg name="plank_of_wood_id" default="2" />
 
   <!-- World setup -->
