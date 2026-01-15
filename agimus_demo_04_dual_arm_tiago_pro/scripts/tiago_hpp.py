@@ -27,7 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 # DAMAGE.
 
-from math import sqrt
+from math import sqrt, sin, cos
 from rostools import process_xacro
 from helper import Helper
 from hpp.corbaserver import loadServerPlugin
@@ -255,20 +255,49 @@ cg.addConstraints(
     ),
 )
 
+# Lock base and torso when grasping
+for e in ["tiago_pro/left > reinforcment_bar/left | f_12",
+          "tiago_pro/left > reinforcment_bar/left | f_23",
+          "tiago_pro/left < reinforcment_bar/left | 0-0_21",
+          "tiago_pro/left < reinforcment_bar/left | 0-0_32"] :
+    cg.addConstraints(edge = e, constraints = Constraints(numConstraints =
+        ["locked_tiago_pro/torso_lift_joint", "locked_tiago_pro/root_joint"]
+        )
+    )
+# Move part vertically when grasped
+cg.addConstraints(edge = "tiago_pro/left < reinforcment_bar/left | 0-0_32",
+    constraints = Constraints(numConstraints = ["place_reinforcment_bar/complement"]))
+cg.addConstraints(edge = "tiago_pro/left > reinforcment_bar/left | f_23",
+    constraints = Constraints(numConstraints = ["place_reinforcment_bar/complement"]))
+
+# Add loop edges with
+#   - locked base and with
+#   - lock arm and torso
+cg.createEdge("free", "free", "Loop | f_arm", 1, "free")
+cg.addConstraints(edge = "Loop | f_arm", constraints = Constraints(
+    numConstraints = ["locked_tiago_pro/root_joint", "place_reinforcment_bar/complement"]))
+cg.createEdge("free", "free", "Loop | f_base", 1, "free")
+cg.addConstraints(edge = "Loop | f_base", constraints = Constraints(
+    numConstraints = locked_arms_and_torso + ["place_reinforcment_bar/complement"]))
+s = "tiago_pro/left grasps reinforcment_bar/left"
+cg.createEdge(s, s, "Loop | 0-0_arm", 1, s)
+cg.addConstraints(edge = "Loop | 0-0_arm", constraints = Constraints(
+    numConstraints = ["locked_tiago_pro/root_joint"]))
+cg.createEdge(s, s, "Loop | 0-0_base", 1, s)
+cg.addConstraints(edge = "Loop | 0-0_base", constraints = Constraints(
+    numConstraints = locked_arms_and_torso))
 # Lock plate in all transitions
 for e in cg.edges.keys():
     cg.addConstraints(
         edge=e, constraints=Constraints(numConstraints=["locked_plate/root_joint"])
     )
 
-cg.setWeight("Loop | f", 1)
-cg.setWeight("Loop | 0-0", 1)
 cg.initialize()
 
 # Set initial configuration
 q0 = robot.getCurrentConfig()
 r = robot.rankInConfiguration["tiago_pro/root_joint"]
-q0[r : r + 4] = [2.6, 0, -1, 0]
+q0[r : r + 4] = [2.6, 0, -cos(.1), sin(.1)]
 r = robot.rankInConfiguration["plate/root_joint"]
 q0[r : r + 3] = [0.6, 0, 0.66]
 r = robot.rankInConfiguration["reinforcment_bar/root_joint"]
@@ -297,5 +326,5 @@ ps.setInitialConfig(q_init)
 ps.addGoalConfig(q_goal)
 
 helper = Helper(ps, cg)
-t = ps.solve()
-helper.optimizePath(ps.numberPaths() - 1)
+#t = ps.solve()
+#helper.optimizePath(ps.numberPaths() - 1)
