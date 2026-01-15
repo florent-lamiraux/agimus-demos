@@ -255,14 +255,28 @@ cg.addConstraints(
     ),
 )
 
+# Add loop edges with
+#   - locked base and with
+#   - lock arm and torso
+cg.createEdge("free", "free", "Loop | f_arm", 1, "free")
+cg.addConstraints(edge = "Loop | f_arm", constraints = Constraints(
+    numConstraints = ["locked_tiago_pro/root_joint", "place_reinforcment_bar/complement"]))
+cg.createEdge("free", "free", "Loop | f_base", 1, "free")
+cg.addConstraints(edge = "Loop | f_base", constraints = Constraints(
+    numConstraints = locked_arms_and_torso + ["place_reinforcment_bar/complement"]))
+s = "tiago_pro/left grasps reinforcment_bar/left"
+cg.createEdge(s, s, "Loop | 0-0_arm", 1, s)
+cg.addConstraints(edge = "Loop | 0-0_arm", constraints = Constraints(
+    numConstraints = ["locked_tiago_pro/root_joint"]))
+cg.createEdge(s, s, "Loop | 0-0_base", 1, s)
+cg.addConstraints(edge = "Loop | 0-0_base", constraints = Constraints(
+    numConstraints = locked_arms_and_torso))
 # Lock plate in all transitions
 for e in cg.edges.keys():
     cg.addConstraints(
         edge=e, constraints=Constraints(numConstraints=["locked_plate/root_joint"])
     )
 
-cg.setWeight("Loop | f", 1)
-cg.setWeight("Loop | 0-0", 1)
 cg.initialize()
 
 # Set initial configuration
@@ -297,5 +311,5 @@ ps.setInitialConfig(q_init)
 ps.addGoalConfig(q_goal)
 
 helper = Helper(ps, cg)
-t = ps.solve()
-helper.optimizePath(ps.numberPaths() - 1)
+#t = ps.solve()
+#helper.optimizePath(ps.numberPaths() - 1)

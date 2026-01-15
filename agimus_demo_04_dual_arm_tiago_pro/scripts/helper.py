@@ -28,7 +28,7 @@
 # DAMAGE.
 
 from CORBA import Any, TC_long, TC_double
-
+from math import sqrt
 
 class Helper:
     def __init__(self, ps, graph):
@@ -48,28 +48,15 @@ class Helper:
         self.cproblem.setParameter(
             "SimpleTimeParameterization/maxAcceleration", Any(TC_double, 0.2)
         )
+        # Create constraint on bar pose (horizontal at .85 meter above the ground
+        self.problem.createPositionConstraint("horizontal-bar",
+            "", "reinforcment_bar/root_joint",
+            [0, 0, 0.85], [0, 0, 0],
+            [False, False, True])
 
     # Generate a preplace configuration from reachable from goal
     def generateIntermediateConfigs(self, q_init, q_goal):
-        self.problem.addNumericalConstraints(
-            "cp",
-            [
-                "tiago_pro/left grasps reinforcment_bar/left",
-                "tiago_pro/right grasps reinforcment_bar/right",
-                "preplace_reinforcment_bar",
-                "locked_plate/root_joint",
-                "place_reinforcment_bar/complement",
-            ],
-            [0, 0, 0, 0, 0],
-        )
         q1 = q_goal[:]
-        # Build projector to project a configuration in preplacement with placement
-        # complement initialized with q_init
-        self.problem.setRightHandSideFromConfigByName(
-            "place_reinforcment_bar/complement", q_init
-        )
-        self.problem.setRightHandSideFromConfigByName("locked_plate/root_joint", q_init)
-
         for i in range(2000):
             q = self.robot.shootRandomConfig()
             # Project random configuration in pregrasp reachable from q_goal
@@ -96,8 +83,50 @@ class Helper:
                 continue
             # Project result on preplacement with place_reinforcment_bar/complement
             # initialized with q_init
+            # Build projector to project a configuration in preplacement with placement
+            # complement initialized with q_init
+            self.problem.resetConstraints()
+            self.problem.addNumericalConstraints(
+                "cp",
+                [
+                    "tiago_pro/left grasps reinforcment_bar/left",
+                    "tiago_pro/right grasps reinforcment_bar/right",
+                    "preplace_reinforcment_bar",
+                    "locked_plate/root_joint",
+                    "place_reinforcment_bar/complement",
+                ],
+                [0, 0, 0, 0, 0],
+            )
+            self.problem.setRightHandSideFromConfigByName(
+                "place_reinforcment_bar/complement", q_init
+            )
+            self.problem.setRightHandSideFromConfigByName("locked_plate/root_joint", q_init)
+
             res, q5, err = self.problem.applyConstraints(q4)
             res, _ = self.robot.isConfigValid(q5)
+            if not res: continue
+            # From q4, generate a configuration where,
+            #    - the bar is grasped,
+            #    - the bar is horizontal at .85 m above the ground,
+            #    - the robot base is in the same pose as in q4
+            self.problem.resetConstraints()
+            self.problem.addNumericalConstraints("cp",
+                ["tiago_pro/left grasps reinforcment_bar/left",
+                 "tiago_pro/right grasps reinforcment_bar/right",
+                 "locked_plate/root_joint",
+                 "locked_tiago_pro/root_joint",
+                 "horizontal-bar"],
+                                                   [0,0,0,0,0])
+            self.problem.setRightHandSideFromConfigByName("locked_plate/root_joint", q_init)
+            self.problem.setRightHandSideFromConfigByName("locked_tiago_pro/root_joint", q4)
+            res, q6, err = self.problem.applyConstraints(q4)
+            if not res: continue
+            res, _ = self.robot.isConfigValid(q6)
+            if not res: continue
+            res, q7, err = self.graph.generateTargetConfig("Loop | 0-0_arm", q5, q6)
+            if not res: continue
+            res, _ = self.robot.isConfigValid(q7)
+            if not res: continue
             if res:
                 break
         if not res:
@@ -105,7 +134,7 @@ class Helper:
                 "Failed to generate intermediate configurations to solve the problem."
             )
         self.problem.resetConstraints()
-        return q4, q5
+        return q5, q7, q6, q4
 
     def optimizePath(self, pid):
         # segment paths into transitions
